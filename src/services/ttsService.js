@@ -160,116 +160,81 @@ export async function generateQuestionAudios(questions, voice = 'alloy') {
  * @param {function} onComplete - Callback when all questions finish
  */
 export async function playQuestionsSequentially(audioObjects, pauseDuration = 2000, onQuestionStart, onComplete) {
-  console.log(`Starting playback of ${audioObjects.length} preloaded audio objects`);
+  console.log(`🎬 Starting iOS-compatible playback of ${audioObjects.length} questions`);
 
-  for (let i = 0; i < audioObjects.length; i++) {
-    const audio = audioObjects[i];
+  // iOS FIX: Use a SINGLE audio element and swap sources to maintain user gesture context
+  // This prevents iOS from blocking playback after pauses
+  const mainAudio = new Audio();
+  mainAudio.preload = 'auto';
+  mainAudio.volume = 1.0;
+  mainAudio.muted = false;
 
-    console.log(`\n========== Question ${i + 1}/${audioObjects.length} ========== (array index: ${i})`);
-    console.log(`Audio object at index ${i}:`, audio ? `exists, src=${audio.src.substring(0, 50)}...` : 'NULL');
+  let currentIndex = 0;
+  let playbackComplete = false;
 
-    if (onQuestionStart) {
-      onQuestionStart(i);
-    }
-
-    if (!audio) {
-      console.warn(`⚠️ Audio ${i + 1} is null, skipping to next`);
-      continue;
-    }
-
-    // Mobile fix: Completely reset the audio element
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.muted = false;
-      audio.volume = 1.0;
-      console.log(`Audio ${i + 1} reset - duration: ${audio.duration}s, ready: ${audio.readyState}, paused: ${audio.paused}`);
-    } catch (e) {
-      console.error(`Failed to reset audio ${i + 1}:`, e);
-    }
-
-    let hasResolved = false;
-    let startTime = Date.now();
-
-    await new Promise((resolve) => {
-      // Safety timeout
-      const timeoutId = setTimeout(() => {
-        if (!hasResolved) {
-          console.warn(`Audio ${i + 1} timed out after 15s`);
-          hasResolved = true;
-          audio.pause();
-          resolve();
-        }
-      }, 15000);
-
-      const safeResolve = () => {
-        if (!hasResolved) {
-          hasResolved = true;
-          clearTimeout(timeoutId);
-
-          const playTime = Date.now() - startTime;
-          console.log(`✅ Audio ${i + 1} (index ${i}) COMPLETED after ${playTime}ms (expected ~${Math.round(audio.duration * 1000)}ms)`);
-
-          // Detect if audio was blocked
-          if (playTime < 500 && audio.duration > 1) {
-            console.error(`❌ Audio ${i + 1} ended too quickly - AUTOPLAY BLOCKED!`);
-          }
-
-          console.log(`→ Moving to next audio (will be index ${i + 1})\n`);
-          resolve();
-        } else {
-          console.warn(`⚠️ safeResolve called multiple times for audio ${i + 1} - ignored`);
-        }
-      };
-
-      // Set up event handlers
-      const cleanup = () => {
-        audio.onended = null;
-        audio.onerror = null;
-      };
-
-      audio.onended = () => {
-        console.log(`🎵 onended fired for Audio ${i + 1} (index ${i})`);
-        cleanup();
-        safeResolve();
-      };
-
-      audio.onerror = (error) => {
-        console.error(`❌ onerror fired for Audio ${i + 1} (index ${i}):`, error);
-        cleanup();
-        safeResolve();
-      };
-
-      // Play the preloaded audio
-      console.log(`Attempting to play audio ${i + 1} (duration: ${audio.duration}s, ready state: ${audio.readyState})`);
-
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log(`✅ Audio ${i + 1} playing successfully`);
-          })
-          .catch((error) => {
-            console.error(`❌ Audio ${i + 1} play() FAILED:`, error.name, error.message);
-            cleanup();
-            safeResolve();
-          });
-      } else {
-        console.warn(`Audio ${i + 1} play() returned undefined (old browser?)`);
+  return new Promise((resolveAll) => {
+    const playNextQuestion = () => {
+      if (currentIndex >= audioObjects.length || playbackComplete) {
+        console.log('🎉 All questions completed');
+        if (onComplete) onComplete();
+        resolveAll();
+        return;
       }
-    });
 
-    // Pause between questions (except after last one)
-    if (i < audioObjects.length - 1) {
-      console.log(`Pausing for ${pauseDuration}ms before next question`);
-      await new Promise(resolve => setTimeout(resolve, pauseDuration));
-    }
-  }
+      const sourceAudio = audioObjects[currentIndex];
+      console.log(`\n========== Question ${currentIndex + 1}/${audioObjects.length} ==========`);
 
-  console.log('🎉 All audio playback completed');
-  if (onComplete) {
-    onComplete();
-  }
+      if (!sourceAudio) {
+        console.warn(`⚠️ Audio ${currentIndex + 1} is null, skipping`);
+        currentIndex++;
+        playNextQuestion();
+        return;
+      }
+
+      if (onQuestionStart) {
+        onQuestionStart(currentIndex);
+      }
+
+      // Set source from the preloaded audio blob
+      mainAudio.src = sourceAudio.src;
+      console.log(`📥 Loaded audio ${currentIndex + 1}, duration: ${sourceAudio.duration}s`);
+
+      // When this question ends, play next after pause
+      mainAudio.onended = () => {
+        console.log(`✅ Question ${currentIndex + 1} completed`);
+        currentIndex++;
+
+        if (currentIndex < audioObjects.length) {
+          console.log(`⏸️ Pausing ${pauseDuration}ms before next question`);
+          // Schedule next play IMMEDIATELY in same call stack to maintain user gesture
+          setTimeout(() => playNextQuestion(), pauseDuration);
+        } else {
+          playNextQuestion(); // No more questions
+        }
+      };
+
+      mainAudio.onerror = (e) => {
+        console.error(`❌ Error playing question ${currentIndex + 1}:`, e);
+        currentIndex++;
+        playNextQuestion();
+      };
+
+      // Play immediately - this maintains the user gesture context chain
+      const playPromise = mainAudio.play();
+      if (playPromise) {
+        playPromise
+          .then(() => console.log(`▶️ Question ${currentIndex + 1} playing`))
+          .catch((err) => {
+            console.error(`❌ Play failed for question ${currentIndex + 1}:`, err);
+            currentIndex++;
+            playNextQuestion();
+          });
+      }
+    };
+
+    // Start playback chain
+    playNextQuestion();
+  });
 }
 
 /**
