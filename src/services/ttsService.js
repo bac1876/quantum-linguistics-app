@@ -162,35 +162,31 @@ export async function generateQuestionAudios(questions, voice = 'alloy') {
 export async function playQuestionsSequentially(audioObjects, pauseDuration = 2000, onQuestionStart, onComplete) {
   console.log(`Starting playback of ${audioObjects.length} preloaded audio objects`);
 
-  // Mobile fix: Ensure all audio objects are unmuted and have volume
-  audioObjects.forEach((audio, idx) => {
-    if (audio) {
-      audio.muted = false;
-      audio.volume = 1.0;
-      console.log(`Audio ${idx + 1} muted=${audio.muted}, volume=${audio.volume}`);
-    }
-  });
-
   for (let i = 0; i < audioObjects.length; i++) {
     const audio = audioObjects[i];
 
-    console.log(`Playing question ${i + 1}/${audioObjects.length}`);
+    console.log(`\n========== Question ${i + 1}/${audioObjects.length} ========== (array index: ${i})`);
+    console.log(`Audio object at index ${i}:`, audio ? `exists, src=${audio.src.substring(0, 50)}...` : 'NULL');
 
     if (onQuestionStart) {
       onQuestionStart(i);
     }
 
     if (!audio) {
-      console.warn(`Audio ${i + 1} is null, skipping`);
+      console.warn(`⚠️ Audio ${i + 1} is null, skipping to next`);
       continue;
     }
 
-    // Reset to beginning in case it was played before
-    audio.currentTime = 0;
-
-    // Mobile fix: Explicitly set unmuted and full volume before each play
-    audio.muted = false;
-    audio.volume = 1.0;
+    // Mobile fix: Completely reset the audio element
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.muted = false;
+      audio.volume = 1.0;
+      console.log(`Audio ${i + 1} reset - duration: ${audio.duration}s, ready: ${audio.readyState}, paused: ${audio.paused}`);
+    } catch (e) {
+      console.error(`Failed to reset audio ${i + 1}:`, e);
+    }
 
     let hasResolved = false;
     let startTime = Date.now();
@@ -212,14 +208,17 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
           clearTimeout(timeoutId);
 
           const playTime = Date.now() - startTime;
-          console.log(`Audio ${i + 1} completed after ${playTime}ms (expected ~${Math.round(audio.duration * 1000)}ms)`);
+          console.log(`✅ Audio ${i + 1} (index ${i}) COMPLETED after ${playTime}ms (expected ~${Math.round(audio.duration * 1000)}ms)`);
 
           // Detect if audio was blocked
           if (playTime < 500 && audio.duration > 1) {
             console.error(`❌ Audio ${i + 1} ended too quickly - AUTOPLAY BLOCKED!`);
           }
 
+          console.log(`→ Moving to next audio (will be index ${i + 1})\n`);
           resolve();
+        } else {
+          console.warn(`⚠️ safeResolve called multiple times for audio ${i + 1} - ignored`);
         }
       };
 
@@ -230,13 +229,13 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
       };
 
       audio.onended = () => {
-        console.log(`🎵 Audio ${i + 1} ended event fired`);
+        console.log(`🎵 onended fired for Audio ${i + 1} (index ${i})`);
         cleanup();
         safeResolve();
       };
 
       audio.onerror = (error) => {
-        console.error(`❌ Audio ${i + 1} error event:`, error);
+        console.error(`❌ onerror fired for Audio ${i + 1} (index ${i}):`, error);
         cleanup();
         safeResolve();
       };
