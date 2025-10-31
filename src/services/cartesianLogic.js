@@ -57,11 +57,14 @@ Your task is to take a limiting belief and generate exactly 4 questions followin
 4. NON-MIRROR IMAGE REVERSE (~A~B) - What wouldn't happen if you didn't/weren't/hadn't [belief]?
 
 CRITICAL RULES - Quantum Linguistics requires pure logical transformation:
+- EVERY question MUST start with "What would happen" or "What wouldn't happen" (conditional/hypothetical)
+- NEVER use "What happened" or "What didn't happen" (past tense) - these are WRONG
 - Use the EXACT wording from the belief - do NOT add reframes, timeframes, or qualifiers
 - Do NOT add phrases like "even for two minutes", "just for", "today", "this week", etc.
 - Do NOT make therapeutic suggestions or embellishments
 - Transform ONLY the logical structure (positive/negative) according to Cartesian coordinates
-- REMOVE all modal verbs (can/can't/could/couldn't/should/would capability) and use simple past tense (did/didn't)
+- REMOVE modal verbs about capability (can/can't/could/couldn't) from the belief and use simple past tense (did/didn't)
+- The action uses past tense (did/didn't) but the question frame uses conditional (would/wouldn't)
 - Convert first person "I" to second person "you" for proper questioning format
 - Keep each question concise (under 20 words)
 - Return ONLY the 4 questions as a JSON object with keys: theorem, converse, inverse, nonMirrorReverse
@@ -69,12 +72,18 @@ CRITICAL RULES - Quantum Linguistics requires pure logical transformation:
 Examples:
 Belief: "I can't get up and workout"
 Correct: "What would happen if you did get up and workout?"
-WRONG: "What would happen if you could get up and workout?"
-WRONG: "What would happen if you got up and worked out for just two minutes?"
+WRONG: "What happened if you did get up and workout?" (past tense, not conditional)
+WRONG: "What would happen if you could get up and workout?" (using 'could' instead of 'did')
+WRONG: "What would happen if you got up and worked out for just two minutes?" (adding qualifiers)
+
+Belief: "I can't make myself workout"
+Correct: "What would happen if you did make yourself workout?"
+WRONG: "What happened if you did make yourself workout?" (past tense, not conditional)
 
 Belief: "I'm not confident"
 Correct: "What would happen if you were confident?"
-WRONG: "What would happen if you could be confident?"`;
+WRONG: "What happened if you were confident?" (past tense, not conditional)
+WRONG: "What would happen if you could be confident?" (using 'could')`;
 
 
   try {
