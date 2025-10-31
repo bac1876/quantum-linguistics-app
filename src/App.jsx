@@ -16,6 +16,7 @@ function App() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
   const [error, setError] = useState('');
   const pauseDurationRef = useRef(2000); // Default 2 seconds
+  const wakeLockRef = useRef(null); // Store wake lock reference
 
   const handleBeliefSubmit = async (belief) => {
     setCurrentBelief(belief);
@@ -64,6 +65,16 @@ function App() {
     setIsPlaying(true);
     setError('');
 
+    // Mobile fix: Request Wake Lock to keep screen active during playback
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('✅ Wake Lock acquired - screen will stay active');
+      }
+    } catch (err) {
+      console.warn('Wake Lock not supported or failed:', err);
+    }
+
     try {
       await playQuestionsSequentially(
         audioObjects,
@@ -74,6 +85,12 @@ function App() {
         () => {
           setIsPlaying(false);
           setCurrentQuestionIndex(-1);
+          // Release wake lock when playback completes
+          if (wakeLockRef.current) {
+            wakeLockRef.current.release();
+            wakeLockRef.current = null;
+            console.log('✅ Wake Lock released');
+          }
         }
       );
     } catch (err) {
@@ -81,6 +98,12 @@ function App() {
       setError('Playback failed. Please try again.');
       setIsPlaying(false);
       setCurrentQuestionIndex(-1);
+      // Release wake lock on error
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('✅ Wake Lock released (error)');
+      }
     }
   };
 
@@ -88,6 +111,12 @@ function App() {
     stopSpeech();
     setIsPlaying(false);
     setCurrentQuestionIndex(-1);
+    // Release wake lock if active
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release();
+      wakeLockRef.current = null;
+      console.log('✅ Wake Lock released (manual stop)');
+    }
   };
 
   const handleNewSession = () => {
