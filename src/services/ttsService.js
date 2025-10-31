@@ -123,27 +123,70 @@ export async function generateQuestionAudios(questions, voice = 'alloy') {
  * @param {function} onComplete - Callback when all questions finish
  */
 export async function playQuestionsSequentially(audioUrls, pauseDuration = 2000, onQuestionStart, onComplete) {
+  console.log(`Starting playback of ${audioUrls.length} audio files`);
+
   for (let i = 0; i < audioUrls.length; i++) {
+    console.log(`Processing question ${i + 1}/${audioUrls.length}`);
+
     if (onQuestionStart) {
       onQuestionStart(i);
     }
 
     if (audioUrls[i]) {
-      // Play audio from OpenAI TTS
+      // Play audio from OpenAI TTS with timeout safety
       await new Promise((resolve) => {
         const audio = new Audio(audioUrls[i]);
-        audio.onended = resolve;
-        audio.onerror = resolve; // Continue even if error
-        audio.play();
+        let hasResolved = false;
+
+        // Safety timeout (30 seconds max per audio)
+        const timeoutId = setTimeout(() => {
+          if (!hasResolved) {
+            console.warn(`Audio ${i + 1} timed out after 30s`);
+            hasResolved = true;
+            resolve();
+          }
+        }, 30000);
+
+        const safeResolve = () => {
+          if (!hasResolved) {
+            hasResolved = true;
+            clearTimeout(timeoutId);
+            resolve();
+          }
+        };
+
+        audio.onended = () => {
+          console.log(`Audio ${i + 1} completed`);
+          safeResolve();
+        };
+
+        audio.onerror = (error) => {
+          console.error(`Audio ${i + 1} playback error:`, error);
+          safeResolve();
+        };
+
+        // audio.play() returns a Promise on modern browsers
+        audio.play()
+          .then(() => {
+            console.log(`Audio ${i + 1} started playing`);
+          })
+          .catch((error) => {
+            console.error(`Audio ${i + 1} play failed:`, error);
+            safeResolve(); // Skip this audio if play fails
+          });
       });
+    } else {
+      console.warn(`Audio ${i + 1} URL is null/undefined`);
     }
 
     // Pause between questions (except after last one)
     if (i < audioUrls.length - 1) {
+      console.log(`Pausing for ${pauseDuration}ms`);
       await new Promise(resolve => setTimeout(resolve, pauseDuration));
     }
   }
 
+  console.log('All audio playback completed');
   if (onComplete) {
     onComplete();
   }
