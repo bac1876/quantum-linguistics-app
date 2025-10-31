@@ -162,6 +162,15 @@ export async function generateQuestionAudios(questions, voice = 'alloy') {
 export async function playQuestionsSequentially(audioObjects, pauseDuration = 2000, onQuestionStart, onComplete) {
   console.log(`Starting playback of ${audioObjects.length} preloaded audio objects`);
 
+  // Mobile fix: Ensure all audio objects are unmuted and have volume
+  audioObjects.forEach((audio, idx) => {
+    if (audio) {
+      audio.muted = false;
+      audio.volume = 1.0;
+      console.log(`Audio ${idx + 1} muted=${audio.muted}, volume=${audio.volume}`);
+    }
+  });
+
   for (let i = 0; i < audioObjects.length; i++) {
     const audio = audioObjects[i];
 
@@ -178,6 +187,10 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
 
     // Reset to beginning in case it was played before
     audio.currentTime = 0;
+
+    // Mobile fix: Explicitly set unmuted and full volume before each play
+    audio.muted = false;
+    audio.volume = 1.0;
 
     let hasResolved = false;
     let startTime = Date.now();
