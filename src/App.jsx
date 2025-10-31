@@ -157,10 +157,10 @@ function App() {
         {/* Footer */}
         <footer className="mt-16 text-center text-sm text-gray-500 dark:text-gray-400">
           <p>
-            Powered by GPT-5 and NLP Quantum Linguistics
+            Powered by GPT-5 and OpenAI TTS
           </p>
           <p className="mt-1">
-            © 2025 Quantum Linguistics App
+            NLP Quantum Linguistics • © 2025
           </p>
         </footer>
       </div>

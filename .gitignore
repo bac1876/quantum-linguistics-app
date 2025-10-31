@@ -33,3 +33,5 @@ dist-ssr
 # API Keys (extra protection)
 **/api-keys.txt
 **/*secret*
+
+.vercel

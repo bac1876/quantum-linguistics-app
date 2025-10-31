@@ -27,7 +27,7 @@ Cartesian Logic uses four distinct questions to explore beliefs from all angles,
 - **Frontend**: React 18 + Vite
 - **Styling**: Tailwind CSS
 - **AI**: OpenAI GPT-5 API
-- **TTS**: ElevenLabs API (with Web Speech API fallback)
+- **TTS**: OpenAI TTS API (with Web Speech API fallback)
 - **Speech Recognition**: Web Speech API
 - **PWA**: Vite PWA Plugin
 
@@ -36,8 +36,7 @@ Cartesian Logic uses four distinct questions to explore beliefs from all angles,
 ### Prerequisites
 
 - Node.js 18+ and npm
-- OpenAI API key (required)
-- ElevenLabs API key (optional, uses browser TTS if not provided)
+- OpenAI API key (required for both GPT-5 and TTS)
 
 ### Setup Steps
 
@@ -57,10 +56,9 @@ Cartesian Logic uses four distinct questions to explore beliefs from all angles,
    Create a `.env` file in the project root:
    ```
    VITE_OPENAI_API_KEY=your_openai_api_key_here
-   VITE_ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
    ```
 
-   **Important**: The `.env` file is already in `.gitignore` to protect your API keys.
+   **Important**: The `.env` file is already in `.gitignore` to protect your API key.
 
 4. **Start the development server**
    ```bash
@@ -122,9 +120,7 @@ npm run preview
 4. **Add Environment Variables**
    - Go to your Vercel project dashboard
    - Navigate to Settings → Environment Variables
-   - Add:
-     - `VITE_OPENAI_API_KEY`
-     - `VITE_ELEVENLABS_API_KEY` (optional)
+   - Add: `VITE_OPENAI_API_KEY`
 
 5. **Redeploy**
    ```bash
@@ -154,17 +150,9 @@ Vercel automatically detects Vite projects and configures the build settings.
 4. Create a new secret key
 5. Copy and add to your `.env` file
 
-**Note**: This app uses GPT-5 (model: `gpt-5`). Ensure your OpenAI account has access.
+**Note**: This app uses GPT-5 (model: `gpt-5`) for question generation and OpenAI TTS (model: `tts-1-hd`) for high-quality text-to-speech. Ensure your OpenAI account has access to both APIs.
 
-### ElevenLabs API Key (Optional)
-
-1. Go to [elevenlabs.io](https://elevenlabs.io)
-2. Sign up or log in
-3. Navigate to Profile → API Keys
-4. Generate a new API key
-5. Copy and add to your `.env` file
-
-If no ElevenLabs key is provided, the app uses the browser's built-in Web Speech API for TTS.
+If the OpenAI TTS API is unavailable, the app automatically falls back to the browser's built-in Web Speech API.
 
 ## Project Structure
 
@@ -222,7 +210,7 @@ For the best experience, use a modern browser with microphone access.
 - Try Chrome or Edge if using another browser
 
 ### "Audio playback failed"
-- Check ElevenLabs API key if using premium TTS
+- Check OpenAI API key is valid
 - Browser fallback should work automatically
 - Ensure audio isn't muted in your browser
 
@@ -240,6 +228,6 @@ For issues or questions, please open an issue on GitHub.
 
 ---
 
-**Powered by GPT-5 and NLP Quantum Linguistics**
+**Powered by GPT-5 and OpenAI TTS**
 
-© 2025 Quantum Linguistics App
+NLP Quantum Linguistics • © 2025

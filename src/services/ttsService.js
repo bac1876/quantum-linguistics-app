@@ -1,44 +1,44 @@
 /**
  * Text-to-Speech Service
- * Supports ElevenLabs API with Web Speech API fallback
+ * Supports OpenAI TTS API with Web Speech API fallback
  */
 
-const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE_ID = 'pNInz6obpgDQGcFmaJgB'; // Adam voice (calm, thoughtful)
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true // Note: In production, route through backend
+});
 
 /**
- * Generate speech using ElevenLabs API
+ * Generate speech using OpenAI TTS API
  * @param {string} text - Text to convert to speech
+ * @param {string} voice - Voice to use (alloy, echo, fable, onyx, nova, shimmer)
  * @returns {Promise<Blob>} - Audio blob
  */
-async function generateElevenLabsSpeech(text) {
-  const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
-    {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY
-      },
-      body: JSON.stringify({
-        text,
-        model_id: 'eleven_monolingual_v1',
-        voice_settings: {
-          stability: 0.6,
-          similarity_boost: 0.8,
-          style: 0.2,
-          use_speaker_boost: true
-        }
-      })
-    }
-  );
+async function generateOpenAISpeech(text, voice = 'alloy') {
+  try {
+    console.log('Calling OpenAI TTS API...');
+    const response = await openai.audio.speech.create({
+      model: 'tts-1-hd', // High-quality model
+      voice: voice, // alloy, echo, fable, onyx, nova, shimmer
+      input: text,
+      speed: 0.95, // Slightly slower for contemplation
+    });
 
-  if (!response.ok) {
-    throw new Error(`ElevenLabs API error: ${response.statusText}`);
+    // Convert response to blob
+    const arrayBuffer = await response.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+    console.log('OpenAI TTS response received successfully');
+    return blob;
+  } catch (error) {
+    console.error('OpenAI TTS API Error:', {
+      message: error.message,
+      status: error.status,
+      type: error.type
+    });
+    throw error;
   }
-
-  return await response.blob();
 }
 
 /**
@@ -76,15 +76,16 @@ function generateBrowserSpeech(text) {
 }
 
 /**
- * Main TTS function - tries ElevenLabs first, falls back to browser
+ * Main TTS function - tries OpenAI TTS first, falls back to browser
  * @param {string} text - Text to convert to speech
+ * @param {string} voice - OpenAI voice (alloy, echo, fable, onyx, nova, shimmer)
  * @param {boolean} useBrowserFallback - Force use of browser TTS
- * @returns {Promise<string|null>} - Returns audio URL for ElevenLabs, null for browser TTS
+ * @returns {Promise<string|null>} - Returns audio URL for OpenAI TTS, null for browser TTS
  */
-export async function textToSpeech(text, useBrowserFallback = false) {
+export async function textToSpeech(text, voice = 'alloy', useBrowserFallback = false) {
   try {
-    if (!useBrowserFallback && ELEVENLABS_API_KEY) {
-      const audioBlob = await generateElevenLabsSpeech(text);
+    if (!useBrowserFallback && import.meta.env.VITE_OPENAI_API_KEY) {
+      const audioBlob = await generateOpenAISpeech(text, voice);
       const audioUrl = URL.createObjectURL(audioBlob);
       return audioUrl;
     } else {
@@ -106,10 +107,11 @@ export async function textToSpeech(text, useBrowserFallback = false) {
 /**
  * Generate audio for all four Cartesian questions
  * @param {array} questions - Array of formatted questions
+ * @param {string} voice - OpenAI voice to use
  * @returns {Promise<array>} - Array of audio URLs
  */
-export async function generateQuestionAudios(questions) {
-  const audioPromises = questions.map(q => textToSpeech(q.question));
+export async function generateQuestionAudios(questions, voice = 'alloy') {
+  const audioPromises = questions.map(q => textToSpeech(q.question, voice));
   return await Promise.all(audioPromises);
 }
 
@@ -127,7 +129,7 @@ export async function playQuestionsSequentially(audioUrls, pauseDuration = 2000,
     }
 
     if (audioUrls[i]) {
-      // Play audio from ElevenLabs
+      // Play audio from OpenAI TTS
       await new Promise((resolve) => {
         const audio = new Audio(audioUrls[i]);
         audio.onended = resolve;
@@ -157,9 +159,21 @@ export function stopSpeech() {
 }
 
 /**
- * Check if ElevenLabs API is available
+ * Check if OpenAI API is available
  * @returns {boolean}
  */
-export function isElevenLabsAvailable() {
-  return !!ELEVENLABS_API_KEY;
+export function isOpenAIAvailable() {
+  return !!import.meta.env.VITE_OPENAI_API_KEY;
 }
+
+/**
+ * Available OpenAI voices
+ */
+export const AVAILABLE_VOICES = [
+  { id: 'alloy', name: 'Alloy', description: 'Neutral and balanced' },
+  { id: 'echo', name: 'Echo', description: 'Calm and professional' },
+  { id: 'fable', name: 'Fable', description: 'Warm and expressive' },
+  { id: 'onyx', name: 'Onyx', description: 'Deep and authoritative' },
+  { id: 'nova', name: 'Nova', description: 'Bright and energetic' },
+  { id: 'shimmer', name: 'Shimmer', description: 'Soft and gentle' }
+];
