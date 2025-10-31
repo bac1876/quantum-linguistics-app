@@ -9,7 +9,7 @@ function App() {
   const [currentBelief, setCurrentBelief] = useState('');
   const [questions, setQuestions] = useState(null);
   const [formattedQuestions, setFormattedQuestions] = useState([]);
-  const [audioUrls, setAudioUrls] = useState([]);
+  const [audioObjects, setAudioObjects] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
@@ -30,9 +30,9 @@ function App() {
       const formatted = formatQuestionsForDisplay(generatedQuestions);
       setFormattedQuestions(formatted);
 
-      // Generate audio for all questions
+      // Generate audio objects for all questions (preloaded and ready)
       const audios = await generateQuestionAudios(formatted);
-      setAudioUrls(audios);
+      setAudioObjects(audios);
 
     } catch (err) {
       console.error('Error processing belief:', err);
@@ -43,7 +43,7 @@ function App() {
   };
 
   const handlePlay = async () => {
-    if (audioUrls.length === 0) {
+    if (audioObjects.length === 0) {
       setError('No audio available. Please generate questions first.');
       return;
     }
@@ -53,7 +53,7 @@ function App() {
 
     try {
       await playQuestionsSequentially(
-        audioUrls,
+        audioObjects,
         pauseDurationRef.current,
         (index) => {
           setCurrentQuestionIndex(index);
@@ -82,7 +82,7 @@ function App() {
     setCurrentBelief('');
     setQuestions(null);
     setFormattedQuestions([]);
-    setAudioUrls([]);
+    setAudioObjects([]);
     setError('');
   };
 
