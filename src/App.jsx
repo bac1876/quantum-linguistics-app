@@ -11,6 +11,7 @@ function App() {
   const [formattedQuestions, setFormattedQuestions] = useState([]);
   const [audioObjects, setAudioObjects] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
   const [error, setError] = useState('');
@@ -19,6 +20,7 @@ function App() {
   const handleBeliefSubmit = async (belief) => {
     setCurrentBelief(belief);
     setIsProcessing(true);
+    setIsLoadingAudio(false);
     setError('');
 
     try {
@@ -30,15 +32,26 @@ function App() {
       const formatted = formatQuestionsForDisplay(generatedQuestions);
       setFormattedQuestions(formatted);
 
+      setIsProcessing(false); // Questions are ready, show them
+      setIsLoadingAudio(true); // Now loading audio
+
       // Generate audio objects for all questions (preloaded and ready)
       const audios = await generateQuestionAudios(formatted);
+
+      // Verify all audios loaded successfully
+      const validAudios = audios.filter(a => a !== null);
+      if (validAudios.length < formatted.length) {
+        console.warn(`Only ${validAudios.length}/${formatted.length} audio files loaded successfully`);
+      }
+
       setAudioObjects(audios);
+      setIsLoadingAudio(false);
 
     } catch (err) {
       console.error('Error processing belief:', err);
       setError('Failed to generate questions. Please try again.');
-    } finally {
       setIsProcessing(false);
+      setIsLoadingAudio(false);
     }
   };
 
@@ -149,6 +162,7 @@ function App() {
               onPlay={handlePlay}
               onStop={handleStop}
               isPlaying={isPlaying}
+              isLoadingAudio={isLoadingAudio}
               onNewSession={handleNewSession}
             />
           )}
