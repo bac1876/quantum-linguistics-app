@@ -59,7 +59,9 @@ Your task is to take a limiting belief and generate exactly 4 questions followin
 CRITICAL RULES - Quantum Linguistics requires pure logical transformation:
 - EVERY question MUST start with "What would happen" or "What wouldn't happen" (conditional/hypothetical)
 - NEVER use "What happened" or "What didn't happen" (past tense) - these are WRONG
-- Use the EXACT wording from the belief - do NOT add reframes, timeframes, or qualifiers
+- Focus on the CORE ACTION, not meta-language about doing it
+- REMOVE wrapper phrases like "get myself to", "make myself", "force myself to", "convince myself to"
+- Use the EXACT wording from the belief's core action - do NOT add reframes, timeframes, or qualifiers
 - Do NOT add phrases like "even for two minutes", "just for", "today", "this week", etc.
 - Do NOT make therapeutic suggestions or embellishments
 - Transform ONLY the logical structure (positive/negative) according to Cartesian coordinates
@@ -70,20 +72,22 @@ CRITICAL RULES - Quantum Linguistics requires pure logical transformation:
 - Return ONLY the 4 questions as a JSON object with keys: theorem, converse, inverse, nonMirrorReverse
 
 Examples:
+Belief: "I can't get myself to workout in the morning"
+Correct: "What would happen if you did workout in the morning?"
+WRONG: "What would happen if you did get yourself to workout in the morning?" (kept meta-language)
+WRONG: "What happened if you did workout in the morning?" (past tense, not conditional)
+WRONG: "What would happen if you could workout in the morning?" (using 'could' instead of 'did')
+
+Belief: "I can't make myself exercise"
+Correct: "What would happen if you did exercise?"
+WRONG: "What would happen if you did make yourself exercise?" (kept meta-language)
+
 Belief: "I can't get up and workout"
 Correct: "What would happen if you did get up and workout?"
-WRONG: "What happened if you did get up and workout?" (past tense, not conditional)
-WRONG: "What would happen if you could get up and workout?" (using 'could' instead of 'did')
-WRONG: "What would happen if you got up and worked out for just two minutes?" (adding qualifiers)
-
-Belief: "I can't make myself workout"
-Correct: "What would happen if you did make yourself workout?"
-WRONG: "What happened if you did make yourself workout?" (past tense, not conditional)
 
 Belief: "I'm not confident"
 Correct: "What would happen if you were confident?"
-WRONG: "What happened if you were confident?" (past tense, not conditional)
-WRONG: "What would happen if you could be confident?" (using 'could')`;
+WRONG: "What happened if you were confident?" (past tense, not conditional)`;
 
 
   try {
@@ -137,6 +141,13 @@ function generateTemplateQuestions(belief, parsed) {
     .replace(/^I'm\s+/i, 'you were ')
     .replace(/^I\s+am\s+/i, 'you were ')
     .replace(/^I\s+/i, 'you ');
+
+  // Remove meta-language wrapper phrases that are part of the limiting belief structure
+  cleanedBelief = cleanedBelief
+    .replace(/\bget\s+(yourself|myself)\s+to\s+/gi, '')
+    .replace(/\bmake\s+(yourself|myself)\s+/gi, '')
+    .replace(/\bforce\s+(yourself|myself)\s+to\s+/gi, '')
+    .replace(/\bconvince\s+(yourself|myself)\s+to\s+/gi, '');
 
   // Convert all pronouns from first person to second person
   cleanedBelief = cleanedBelief
