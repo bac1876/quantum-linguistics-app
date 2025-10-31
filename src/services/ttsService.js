@@ -223,13 +223,10 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
         }
       };
 
-      // Mobile fix: Add multiple event listeners to catch all completion scenarios
+      // Set up event handlers
       const cleanup = () => {
         audio.onended = null;
         audio.onerror = null;
-        audio.onpause = null;
-        audio.onstalled = null;
-        audio.onsuspend = null;
       };
 
       audio.onended = () => {
@@ -242,29 +239,6 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
         console.error(`❌ Audio ${i + 1} error event:`, error);
         cleanup();
         safeResolve();
-      };
-
-      // Mobile browsers sometimes pause/suspend audio
-      audio.onpause = () => {
-        // Only resume if audio was interrupted mid-playback, not if it ended naturally
-        const currentTime = audio.currentTime;
-        const duration = audio.duration;
-        const hasEnded = Math.abs(currentTime - duration) < 0.1; // Within 100ms of end
-
-        if (!hasEnded && !hasResolved) {
-          console.warn(`⏸️ Audio ${i + 1} paused at ${currentTime}s/${duration}s - attempting resume`);
-          audio.play().catch(e => console.error('Resume failed:', e));
-        } else {
-          console.log(`⏸️ Audio ${i + 1} paused naturally at end`);
-        }
-      };
-
-      audio.onstalled = () => {
-        console.warn(`⚠️ Audio ${i + 1} stalled - network issue`);
-      };
-
-      audio.onsuspend = () => {
-        console.warn(`⚠️ Audio ${i + 1} suspended - may resume automatically`);
       };
 
       // Play the preloaded audio
