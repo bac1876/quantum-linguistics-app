@@ -223,10 +223,40 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
         }
       };
 
-      audio.onended = safeResolve;
-      audio.onerror = (error) => {
-        console.error(`Audio ${i + 1} error:`, error);
+      // Mobile fix: Add multiple event listeners to catch all completion scenarios
+      const cleanup = () => {
+        audio.onended = null;
+        audio.onerror = null;
+        audio.onpause = null;
+        audio.onstalled = null;
+        audio.onsuspend = null;
+      };
+
+      audio.onended = () => {
+        console.log(`🎵 Audio ${i + 1} ended event fired`);
+        cleanup();
         safeResolve();
+      };
+
+      audio.onerror = (error) => {
+        console.error(`❌ Audio ${i + 1} error event:`, error);
+        cleanup();
+        safeResolve();
+      };
+
+      // Mobile browsers sometimes pause/suspend audio
+      audio.onpause = () => {
+        console.warn(`⏸️ Audio ${i + 1} paused unexpectedly`);
+        // Try to resume playback
+        audio.play().catch(e => console.error('Resume failed:', e));
+      };
+
+      audio.onstalled = () => {
+        console.warn(`⚠️ Audio ${i + 1} stalled`);
+      };
+
+      audio.onsuspend = () => {
+        console.warn(`⚠️ Audio ${i + 1} suspended`);
       };
 
       // Play the preloaded audio
@@ -240,6 +270,7 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
           })
           .catch((error) => {
             console.error(`❌ Audio ${i + 1} play() FAILED:`, error.name, error.message);
+            cleanup();
             safeResolve();
           });
       } else {
