@@ -125,68 +125,114 @@ export async function generateQuestionAudios(questions, voice = 'alloy') {
 export async function playQuestionsSequentially(audioUrls, pauseDuration = 2000, onQuestionStart, onComplete) {
   console.log(`Starting playback of ${audioUrls.length} audio files`);
 
-  for (let i = 0; i < audioUrls.length; i++) {
-    console.log(`Processing question ${i + 1}/${audioUrls.length}`);
+  // Use a single Audio element for better mobile compatibility
+  const audio = new Audio();
+  let currentIndex = 0;
 
-    if (onQuestionStart) {
-      onQuestionStart(i);
-    }
+  const playNext = () => {
+    return new Promise((resolve) => {
+      if (currentIndex >= audioUrls.length) {
+        console.log('All audio playback completed');
+        resolve();
+        return;
+      }
 
-    if (audioUrls[i]) {
-      // Play audio from OpenAI TTS with timeout safety
-      await new Promise((resolve) => {
-        const audio = new Audio(audioUrls[i]);
-        let hasResolved = false;
+      const i = currentIndex;
+      console.log(`Processing question ${i + 1}/${audioUrls.length}`);
 
-        // Safety timeout (30 seconds max per audio)
-        const timeoutId = setTimeout(() => {
-          if (!hasResolved) {
-            console.warn(`Audio ${i + 1} timed out after 30s`);
-            hasResolved = true;
-            resolve();
+      if (onQuestionStart) {
+        onQuestionStart(i);
+      }
+
+      if (!audioUrls[i]) {
+        console.warn(`Audio ${i + 1} URL is null/undefined`);
+        currentIndex++;
+        resolve(playNext());
+        return;
+      }
+
+      let hasResolved = false;
+      let startTime = Date.now();
+
+      // Safety timeout (30 seconds max per audio)
+      const timeoutId = setTimeout(() => {
+        if (!hasResolved) {
+          console.warn(`Audio ${i + 1} timed out after 30s`);
+          hasResolved = true;
+          audio.pause();
+          audio.currentTime = 0;
+          currentIndex++;
+          resolve(playNext());
+        }
+      }, 30000);
+
+      const safeResolve = async () => {
+        if (!hasResolved) {
+          hasResolved = true;
+          clearTimeout(timeoutId);
+
+          const playTime = Date.now() - startTime;
+          console.log(`Audio ${i + 1} completed after ${playTime}ms`);
+
+          // Check if audio actually played (duration > 1 second means real audio)
+          if (playTime < 500 && audio.duration > 0) {
+            console.warn(`Audio ${i + 1} ended too quickly (${playTime}ms) - possible autoplay block`);
           }
-        }, 30000);
 
-        const safeResolve = () => {
-          if (!hasResolved) {
-            hasResolved = true;
-            clearTimeout(timeoutId);
-            resolve();
+          // Pause between questions (except after last one)
+          if (i < audioUrls.length - 1) {
+            console.log(`Pausing for ${pauseDuration}ms`);
+            await new Promise(res => setTimeout(res, pauseDuration));
           }
-        };
 
-        audio.onended = () => {
-          console.log(`Audio ${i + 1} completed`);
+          currentIndex++;
+          resolve(playNext());
+        }
+      };
+
+      // Set up event handlers
+      audio.onended = safeResolve;
+      audio.onerror = (error) => {
+        console.error(`Audio ${i + 1} playback error:`, error);
+        safeResolve();
+      };
+
+      // Wait for audio to be loaded with metadata
+      audio.onloadedmetadata = () => {
+        console.log(`Audio ${i + 1} loaded, duration: ${audio.duration}s`);
+        if (audio.duration === 0 || isNaN(audio.duration)) {
+          console.error(`Audio ${i + 1} has invalid duration, skipping`);
           safeResolve();
-        };
+        }
+      };
 
-        audio.onerror = (error) => {
-          console.error(`Audio ${i + 1} playback error:`, error);
-          safeResolve();
-        };
+      // Set source and play
+      audio.src = audioUrls[i];
+      audio.load();
 
-        // audio.play() returns a Promise on modern browsers
-        audio.play()
+      // Attempt to play
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
           .then(() => {
-            console.log(`Audio ${i + 1} started playing`);
+            console.log(`Audio ${i + 1} started playing successfully`);
           })
           .catch((error) => {
-            console.error(`Audio ${i + 1} play failed:`, error);
-            safeResolve(); // Skip this audio if play fails
+            console.error(`Audio ${i + 1} play() failed:`, error.name, error.message);
+            // Try to play anyway after a short delay (sometimes helps on mobile)
+            setTimeout(() => {
+              audio.play().catch(e => {
+                console.error(`Audio ${i + 1} retry also failed:`, e.message);
+                safeResolve();
+              });
+            }, 100);
           });
-      });
-    } else {
-      console.warn(`Audio ${i + 1} URL is null/undefined`);
-    }
+      }
+    });
+  };
 
-    // Pause between questions (except after last one)
-    if (i < audioUrls.length - 1) {
-      console.log(`Pausing for ${pauseDuration}ms`);
-      await new Promise(resolve => setTimeout(resolve, pauseDuration));
-    }
-  }
+  await playNext();
 
-  console.log('All audio playback completed');
   if (onComplete) {
     onComplete();
   }
