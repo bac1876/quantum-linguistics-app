@@ -158,6 +158,7 @@ export async function generateQuestionAudios(questions, voice = 'alloy') {
  * @param {number} pauseDuration - Pause between questions in ms (default 2000)
  * @param {function} onQuestionStart - Callback when each question starts
  * @param {function} onComplete - Callback when all questions finish
+ * @returns {object} Control object with stop() method
  */
 export async function playQuestionsSequentially(audioObjects, pauseDuration = 2000, onQuestionStart, onComplete) {
   console.log(`🎬 Starting iOS-compatible playback of ${audioObjects.length} questions`);
@@ -171,9 +172,29 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
 
   let currentIndex = 0;
   let playbackComplete = false;
+  let aborted = false; // Flag to stop playback
 
-  return new Promise((resolveAll) => {
+  // Control object to allow external stop
+  const control = {
+    stop: () => {
+      console.log('🛑 Playback stopped by user');
+      aborted = true;
+      mainAudio.pause();
+      mainAudio.currentTime = 0;
+    },
+    audio: mainAudio
+  };
+
+  const promise = new Promise((resolveAll) => {
     const playNextQuestion = () => {
+      // Check if playback was aborted
+      if (aborted) {
+        console.log('🛑 Playback aborted');
+        if (onComplete) onComplete();
+        resolveAll();
+        return;
+      }
+
       if (currentIndex >= audioObjects.length || playbackComplete) {
         console.log('🎉 All questions completed');
         if (onComplete) onComplete();
@@ -234,6 +255,27 @@ export async function playQuestionsSequentially(audioObjects, pauseDuration = 20
 
     // Start playback chain
     playNextQuestion();
+  });
+
+  // Return control object with promise
+  return { promise, control };
+}
+
+/**
+ * Clean up audio objects and revoke blob URLs to prevent memory leaks
+ * @param {array} audioObjects - Array of Audio objects to clean up
+ */
+export function cleanupAudioObjects(audioObjects) {
+  if (!audioObjects || audioObjects.length === 0) return;
+
+  audioObjects.forEach((audio, index) => {
+    if (audio && audio.src) {
+      // Revoke the blob URL to free memory
+      URL.revokeObjectURL(audio.src);
+      console.log(`🧹 Cleaned up audio ${index + 1} blob URL`);
+      // Clear the src to release the audio resource
+      audio.src = '';
+    }
   });
 }
 

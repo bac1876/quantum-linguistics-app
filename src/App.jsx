@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import BeliefInput from './components/BeliefInput';
 import CartesianQuestions from './components/CartesianQuestions';
 import AudioPlayer from './components/AudioPlayer';
 import { generateCartesianQuestions, formatQuestionsForDisplay } from './services/cartesianLogic';
-import { generateQuestionAudios, playQuestionsSequentially, stopSpeech } from './services/ttsService';
+import { generateQuestionAudios, playQuestionsSequentially, stopSpeech, cleanupAudioObjects } from './services/ttsService';
 
 function App() {
   const [currentBelief, setCurrentBelief] = useState('');
@@ -17,8 +17,37 @@ function App() {
   const [error, setError] = useState('');
   const pauseDurationRef = useRef(2000); // Default 2 seconds
   const wakeLockRef = useRef(null); // Store wake lock reference
+  const playbackControlRef = useRef(null); // Store playback control for stop button
+
+  // Wake Lock management - release when tab becomes hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && wakeLockRef.current) {
+        console.log('⚠️ Tab hidden - releasing Wake Lock to save battery');
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Release wake lock if still active
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    };
+  }, []);
 
   const handleBeliefSubmit = async (belief) => {
+    // Clean up previous audio objects if they exist
+    if (audioObjects.length > 0) {
+      cleanupAudioObjects(audioObjects);
+    }
+
     setCurrentBelief(belief);
     setIsProcessing(true);
     setIsLoadingAudio(false);
@@ -41,6 +70,14 @@ function App() {
 
       // Verify all audios loaded successfully
       const validAudios = audios.filter(a => a !== null);
+
+      if (validAudios.length === 0) {
+        // All audio generation failed
+        setError('Failed to generate audio for questions. Please check your API key and try again.');
+        setIsLoadingAudio(false);
+        return;
+      }
+
       if (validAudios.length < formatted.length) {
         console.warn(`Only ${validAudios.length}/${formatted.length} audio files loaded successfully`);
       }
@@ -76,7 +113,7 @@ function App() {
     }
 
     try {
-      await playQuestionsSequentially(
+      const { promise, control } = playQuestionsSequentially(
         audioObjects,
         pauseDurationRef.current,
         (index) => {
@@ -85,6 +122,7 @@ function App() {
         () => {
           setIsPlaying(false);
           setCurrentQuestionIndex(-1);
+          playbackControlRef.current = null;
           // Release wake lock when playback completes
           if (wakeLockRef.current) {
             wakeLockRef.current.release();
@@ -93,11 +131,18 @@ function App() {
           }
         }
       );
+
+      // Store control for stop button
+      playbackControlRef.current = control;
+
+      // Wait for playback to complete
+      await promise;
     } catch (err) {
       console.error('Playback error:', err);
       setError('Playback failed. Please try again.');
       setIsPlaying(false);
       setCurrentQuestionIndex(-1);
+      playbackControlRef.current = null;
       // Release wake lock on error
       if (wakeLockRef.current) {
         wakeLockRef.current.release();
@@ -108,7 +153,12 @@ function App() {
   };
 
   const handleStop = () => {
-    stopSpeech();
+    // Stop audio playback if active
+    if (playbackControlRef.current) {
+      playbackControlRef.current.stop();
+      playbackControlRef.current = null;
+    }
+    stopSpeech(); // Also stop browser TTS if it was used
     setIsPlaying(false);
     setCurrentQuestionIndex(-1);
     // Release wake lock if active
@@ -121,6 +171,8 @@ function App() {
 
   const handleNewSession = () => {
     handleStop();
+    // Clean up audio objects and revoke blob URLs before clearing
+    cleanupAudioObjects(audioObjects);
     setCurrentBelief('');
     setQuestions(null);
     setFormattedQuestions([]);
